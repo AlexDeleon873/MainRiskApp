@@ -23,23 +23,19 @@ def allowed_file(filename):
 def get_system_prompt(analysis_type):
     prompts = {
         "hazards": """You are a professional emergency risk assessment assistant. Analyze the image and identify:
-        1. Immediate hazards and dangers
-        2. Environmental risks
-        3. Structural threats
-        Be concise and actionable for first responders.""",
+1. Immediate hazards and dangers
+2. Environmental risks
+3. Structural threats
+Be concise and actionable for first responders.""",
         "survivors": """You are a professional emergency response analyst. Analyze the image and provide a simple count.
-        Start your response with: "There are X victims/survivors present in the image." where X is the number (0, 1, 2, etc.).
-        Then briefly mention any signs of occupancy or life if visible.
-        Keep the response concise and focused on victim count. After that, analyze the image and assess:
-        1. Potential locations where victims or survivors might be present
-        2. Signs of occupancy or life
-        3. Accessibility for rescue operations
-        Focus on practical rescue considerations."""""",
-        "precautions": ""You are a professional emergency safety expert. Based on the image, provide:
-        1. Required personal protective equipment (PPE)
-        2. Safety precautions and protocols
-        3. Recommended operational procedures
-        Keep recommendations specific and actionable."""
+Start your response with: "There are X victims/survivors present in the image." where X is the number (0, 1, 2, etc.).
+Then briefly mention any signs of occupancy or life if visible.
+Keep the response concise and focused on victim count.""",
+        "precautions": """You are a professional emergency safety expert. Based on the image, provide:
+1. Required personal protective equipment (PPE)
+2. Safety precautions and protocols
+3. Recommended operational procedures
+Keep recommendations specific and actionable."""
     }
     return prompts.get(analysis_type, prompts["hazards"])
 
