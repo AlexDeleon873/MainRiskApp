@@ -130,6 +130,15 @@
         });
     }
 
+    // Utility to fix unwanted spaces within words and clean up Markdown formatting
+    function fixWordSplits(text) {
+      // Remove single spaces within words
+      let fixed = text.replace(/([A-Za-z])\s([A-Za-z])/g, '$1$2');
+      // Remove spaces between asterisks and text for bold/italic
+      fixed = fixed.replace(/\*\s+/g, '*').replace(/\s+\*/g, '*');
+      return fixed;
+    }
+
     // Capture frame from video and analyze
     function captureFrame(analysisType) {
       const video = document.getElementById("videoStream");
@@ -162,7 +171,7 @@
               if (done) {
                 // Render the complete response as HTML when done
                 // Clean up any extra whitespace and render
-                const cleanedResponse = accumulatedResponse.trim();
+                const cleanedResponse = fixWordSplits(accumulatedResponse.trim());
                 resultDiv.innerHTML = marked.parse(cleanedResponse);
                 return;
               }
@@ -170,7 +179,7 @@
               const lines = chunk.split("\n");
               lines.forEach(line => {
                 if (line.startsWith("data: ")) {
-                  accumulatedResponse += line.slice(6);
+                  accumulatedResponse += line.slice(6) + "\n";
                 }
               });
               return readStream();
