@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>First Responder Risk Assessment</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+  <div class="container">
+    <h1>Risk Zone Image Assessment</h1>
+
+    <div style="margin-bottom: 30px;">
+      <button id="modeToggle" class="mode-btn" onclick="toggleMode()">Switch to Video Mode</button>
+    </div>
+
+    <!-- Image Analysis Mode -->
+    <div id="imageMode">
+      <div id="imagePreview" style="display: none; margin-top: 20px;">
+        <img id="preview" style="max-width: 500px; border-radius: 8px;">
+      </div>
+      
+      <input type="file" id="imageInput" name="image" required>
+      <textarea name="question" placeholder="Enter your risk assessment question..." required></textarea>
+      <form id="uploadForm">
+       
+        <button type="submit">Analyze</button>
+        
+      </form>
+    </div>
+
+    <!-- Video Analysis Mode -->
+    <div id="videoMode" style="display: none;">
+      <div style="margin-top: 20px;">
+        <video id="videoStream" width="500" height="375" autoplay muted playsinline style="border-radius: 8px; border: 2px solid red; background-color: #000;"></video>
+        <div style="margin-top: 10px;">
+          <button onclick="startWebcam()" class="control-btn">Start Webcam</button>
+          <button onclick="stopWebcam()" class="control-btn">Stop Webcam</button>
+          <button onclick="captureFrame()" class="control-btn" id="captureBtn" disabled>Capture & Analyze</button>
+        </div>
+      </div>
+      <textarea id="videoQuestion" placeholder="Enter your risk assessment question..." required style="margin-top: 10px;"></textarea>
+    </div>
+
+    <div id="result" style="display: none;"></div>
+  </div>
+
+  <script>
+    let videoStream = null;
+    let isVideoActive = false;
+
+    // Toggle between image and video mode
+    function toggleMode() {
+      const imageMode = document.getElementById("imageMode");
+      const videoMode = document.getElementById("videoMode");
+      const modeToggle = document.getElementById("modeToggle");
+
+      if (imageMode.style.display === "none") {
+        imageMode.style.display = "block";
+        videoMode.style.display = "none";
+        modeToggle.textContent = "Switch to Video Mode";
+        if (isVideoActive) stopWebcam();
+      } else {
+        imageMode.style.display = "none";
+        videoMode.style.display = "block";
+        modeToggle.textContent = "Switch to Image Mode";
+      }
+    }
+
+    // Start webcam
+    async function startWebcam() {
+      try {
+        console.log("Requesting webcam access...");
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        console.log("Webcam access granted");
+        const video = document.getElementById("videoStream");
+        video.srcObject = stream;
+        videoStream = stream;
+        isVideoActive = true;
+        document.getElementById("captureBtn").disabled = false;
+      } catch (err) {
+        alert("Unable to access webcam: " + err.message);
+      }
+    }
+
+    // Stop webcam
+    function stopWebcam() {
+      if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        document.getElementById("videoStream").srcObject = null;
+        isVideoActive = false;
+        document.getElementById("captureBtn").disabled = true;
+      }
+    }
+
+    // Capture frame from video and analyze
+    function captureFrame() {
+      const video = document.getElementById("videoStream");
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(video, 0, 0);
+      
+      canvas.toBlob(blob => {
+        const formData = new FormData();
+        formData.append("frame", blob, "frame.jpg");
+        formData.append("question", document.getElementById("videoQuestion").value);
+        
+        const resultDiv = document.getElementById("result");
+        resultDiv.innerText = "Analyzing frame...";
+        resultDiv.style.display = "block";
+
+        // Use Server-Sent Events for streaming
+        const eventSource = new EventSource("/analyze_stream");
+        eventSource.onmessage = (event) => {
+          resultDiv.innerText += event.data;
+        };
+        
+        eventSource.onerror = () => {
+          eventSource.close();
+        };
+
+        fetch("/analyze_stream", {
+          method: "POST",
+          body: formData
+        }).catch(err => {
+          resultDiv.innerText = "Error: " + err.message;
+        });
+      }, "image/jpeg");
+    }
+
+    // Image mode - file selection preview
+    document.getElementById("imageInput").addEventListener("change", function (e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function (event) {
+          const previewDiv = document.getElementById("imagePreview");
+          const previewImg = document.getElementById("preview");
+          previewImg.src = event.target.result;
+          previewDiv.style.display = "block";
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Image mode - form submission
+    document.getElementById("uploadForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      const formData = new FormData(this);
+
+      const response = await fetch("/analyze", {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await response.json();
+      const resultDiv = document.getElementById("result");
+      resultDiv.innerText = data.analysis || data.error;
+      resultDiv.style.display = "block";
+    });
+  </script>
+
+</body>
+
+</html>
