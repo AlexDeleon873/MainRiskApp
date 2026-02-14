@@ -104,20 +104,19 @@ def analyze():
 
 @app.route("/analyze_stream", methods=["POST"])
 def analyze_stream():
+    # Extract request data while in request context
+    frame_data = request.files.get("frame")
+    analysis_type = request.form.get("analysis_type", "hazards")
+
+    if not frame_data:
+        return jsonify({"error": "No frame data"}), 400
+
+    # Convert frame to base64 while in request context
+    frame_bytes = frame_data.read()
+    base64_frame = base64.b64encode(frame_bytes).decode("utf-8")
+
     def generate():
         try:
-            # Get frame data from request
-            frame_data = request.files.get("frame")
-            analysis_type = request.form.get("analysis_type", "hazards")
-
-            if not frame_data:
-                yield "data: {\"error\": \"No frame data\"}\n\n"
-                return
-
-            # Convert frame to base64
-            frame_bytes = frame_data.read()
-            base64_frame = base64.b64encode(frame_bytes).decode("utf-8")
-
             # Send to OpenAI Vision API with streaming
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
