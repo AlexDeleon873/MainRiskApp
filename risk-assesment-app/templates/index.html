@@ -161,7 +161,9 @@
             return reader.read().then(({ done, value }) => {
               if (done) {
                 // Render the complete response as HTML when done
-                resultDiv.innerHTML = marked.parse(accumulatedResponse);
+                // Clean up any extra whitespace and render
+                const cleanedResponse = accumulatedResponse.trim();
+                resultDiv.innerHTML = marked.parse(cleanedResponse);
                 return;
               }
               const chunk = decoder.decode(value, { stream: true });

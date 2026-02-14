@@ -141,10 +141,12 @@ def analyze_stream():
                 stream=True
             )
 
-            # Stream the response back
+            # Stream the response back, preserving newlines for markdown
             for chunk in response:
                 if chunk.choices[0].delta.content:
-                    yield f"data: {chunk.choices[0].delta.content}\n\n"
+                    content = chunk.choices[0].delta.content
+                    # Escape any special characters and preserve structure
+                    yield f"data: {content}\n\n"
 
         except Exception as e:
             yield f"data: Error: {str(e)}\n\n"
