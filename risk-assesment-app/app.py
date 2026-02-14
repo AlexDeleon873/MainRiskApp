@@ -12,12 +12,36 @@ load_dotenv()
 
 app = Flask(__name__)
 client = OpenAI(api_key=
-                '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')
+                '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')
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
 
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def get_system_prompt(analysis_type):
+    prompts = {
+        "hazards": """You are a professional emergency risk assessment assistant. Analyze the image and identify:
+        1. Immediate hazards and dangers
+        2. Environmental risks
+        3. Structural threats
+        Be concise and actionable for first responders.""",
+        "survivors": """You are a professional emergency response analyst. Analyze the image and provide a simple count.
+        Start your response with: "There are X victims/survivors present in the image." where X is the number (0, 1, 2, etc.).
+        Then briefly mention any signs of occupancy or life if visible.
+        Keep the response concise and focused on victim count. After that, analyze the image and assess:
+        1. Potential locations where victims or survivors might be present
+        2. Signs of occupancy or life
+        3. Accessibility for rescue operations
+        Focus on practical rescue considerations."""""",
+        "precautions": ""You are a professional emergency safety expert. Based on the image, provide:
+        1. Required personal protective equipment (PPE)
+        2. Safety precautions and protocols
+        3. Recommended operational procedures
+        Keep recommendations specific and actionable."""
+    }
+    return prompts.get(analysis_type, prompts["hazards"])
 
 
 @app.route("/")
@@ -31,7 +55,7 @@ def analyze():
         return jsonify({"error": "No image uploaded"}), 400
 
     image_file = request.files["image"]
-    question = request.form.get("question")
+    analysis_type = request.form.get("analysis_type", "hazards")
 
     if image_file.filename == "":
         return jsonify({"error": "No selected file"}), 400
@@ -49,20 +73,14 @@ def analyze():
             messages=[
                 {
                     "role": "system",
-                    "content": """You are a professional emergency risk assessment assistant
-                    helping first responders. Provide:
-                    1. Immediate hazards
-                    2. Environmental risks
-                    3. Structural threats
-                    4. Recommended precautions
-                    Keep responses structured and concise."""
+                    "content": get_system_prompt(analysis_type)
                 },
                 {
                     "role": "user",
                     "content": [
                         {
                             "type": "text",
-                            "text": question
+                            "text": "Analyze this image for emergency response purposes."
                         },
                         {
                             "type": "image_url",
@@ -90,7 +108,7 @@ def analyze_stream():
         try:
             # Get frame data from request
             frame_data = request.files.get("frame")
-            question = request.form.get("question", "Analyze this frame for risks and hazards")
+            analysis_type = request.form.get("analysis_type", "hazards")
 
             if not frame_data:
                 yield "data: {\"error\": \"No frame data\"}\n\n"
@@ -106,19 +124,14 @@ def analyze_stream():
                 messages=[
                     {
                         "role": "system",
-                        "content": """You are a professional emergency risk assessment assistant
-                        analyzing video streams. Provide quick, actionable observations about:
-                        1. Immediate hazards
-                        2. Environmental risks
-                        3. Recommended precautions
-                        Keep responses brief for real-time streaming."""
+                        "content": get_system_prompt(analysis_type)
                     },
                     {
                         "role": "user",
                         "content": [
                             {
                                 "type": "text",
-                                "text": question
+                                "text": "Analyze this video frame for emergency response purposes."
                             },
                             {
                                 "type": "image_url",

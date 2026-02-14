@@ -4,12 +4,13 @@
 <head>
   <title>First Responder Risk Assessment</title>
   <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 
 <body>
 
   <div class="container">
-    <h1>Risk Zone Image Assessment</h1>
+    <h1>Risk Zone Image and Streaming Assessment</h1>
 
     <div style="margin-bottom: 30px;">
       <button id="modeToggle" class="mode-btn" onclick="toggleMode()">Switch to Video Mode</button>
@@ -22,12 +23,11 @@
       </div>
       
       <input type="file" id="imageInput" name="image" required>
-      <textarea name="question" placeholder="Enter your risk assessment question..." required></textarea>
-      <form id="uploadForm">
-       
-        <button type="submit">Analyze</button>
-        
-      </form>
+      <div style="margin-top: 20px;">
+        <button onclick="analyzeImage('hazards')" class="analysis-btn">Immediate Hazards</button>
+        <button onclick="analyzeImage('survivors')" class="analysis-btn">Victims/Survivors</button>
+        <button onclick="analyzeImage('precautions')" class="analysis-btn">Recommended Precautions</button>
+      </div>
     </div>
 
     <!-- Video Analysis Mode -->
@@ -37,10 +37,13 @@
         <div style="margin-top: 10px;">
           <button onclick="startWebcam()" class="control-btn">Start Webcam</button>
           <button onclick="stopWebcam()" class="control-btn">Stop Webcam</button>
-          <button onclick="captureFrame()" class="control-btn" id="captureBtn" disabled>Capture & Analyze</button>
         </div>
       </div>
-      <textarea id="videoQuestion" placeholder="Enter your risk assessment question..." required style="margin-top: 10px;"></textarea>
+      <div style="margin-top: 15px;">
+        <button onclick="captureFrame('hazards')" class="analysis-btn" id="captureHazards" disabled>Immediate Hazards</button>
+        <button onclick="captureFrame('survivors')" class="analysis-btn" id="captureSurvivors" disabled>Victims/Survivors</button>
+        <button onclick="captureFrame('precautions')" class="analysis-btn" id="capturePrecautions" disabled>Recommended Precautions</button>
+      </div>
     </div>
 
     <div id="result" style="display: none;"></div>
@@ -78,7 +81,9 @@
         video.srcObject = stream;
         videoStream = stream;
         isVideoActive = true;
-        document.getElementById("captureBtn").disabled = false;
+        document.getElementById("captureHazards").disabled = false;
+        document.getElementById("captureSurvivors").disabled = false;
+        document.getElementById("capturePrecautions").disabled = false;
       } catch (err) {
         alert("Unable to access webcam: " + err.message);
       }
@@ -90,12 +95,43 @@
         videoStream.getTracks().forEach(track => track.stop());
         document.getElementById("videoStream").srcObject = null;
         isVideoActive = false;
-        document.getElementById("captureBtn").disabled = true;
+        document.getElementById("captureHazards").disabled = true;
+        document.getElementById("captureSurvivors").disabled = true;
+        document.getElementById("capturePrecautions").disabled = true;
       }
     }
 
+    // Analyze image based on type
+    function analyzeImage(analysisType) {
+      const fileInput = document.getElementById("imageInput");
+      if (!fileInput.files || fileInput.files.length === 0) {
+        alert("Please select an image first");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("image", fileInput.files[0]);
+      formData.append("analysis_type", analysisType);
+
+      const resultDiv = document.getElementById("result");
+      resultDiv.innerHTML = "<p>Analyzing image...</p>";
+      resultDiv.style.display = "block";
+
+      fetch("/analyze", {
+        method: "POST",
+        body: formData
+      }).then(response => response.json())
+        .then(data => {
+          const content = data.analysis || data.error;
+          resultDiv.innerHTML = marked.parse(content);
+        })
+        .catch(err => {
+          resultDiv.innerHTML = `<p>Error: ${err.message}</p>`;
+        });
+    }
+
     // Capture frame from video and analyze
-    function captureFrame() {
+    function captureFrame(analysisType) {
       const video = document.getElementById("videoStream");
       const canvas = document.createElement("canvas");
       canvas.width = video.videoWidth;
@@ -106,27 +142,41 @@
       canvas.toBlob(blob => {
         const formData = new FormData();
         formData.append("frame", blob, "frame.jpg");
-        formData.append("question", document.getElementById("videoQuestion").value);
+        formData.append("analysis_type", analysisType);
         
         const resultDiv = document.getElementById("result");
-        resultDiv.innerText = "Analyzing frame...";
+        resultDiv.innerHTML = "<p>Analyzing frame...</p>";
         resultDiv.style.display = "block";
-
-        // Use Server-Sent Events for streaming
-        const eventSource = new EventSource("/analyze_stream");
-        eventSource.onmessage = (event) => {
-          resultDiv.innerText += event.data;
-        };
         
-        eventSource.onerror = () => {
-          eventSource.close();
-        };
+        let accumulatedResponse = "";
 
         fetch("/analyze_stream", {
           method: "POST",
           body: formData
+        }).then(response => {
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          
+          const readStream = () => {
+            return reader.read().then(({ done, value }) => {
+              if (done) {
+                // Render the complete response as HTML when done
+                resultDiv.innerHTML = marked.parse(accumulatedResponse);
+                return;
+              }
+              const chunk = decoder.decode(value, { stream: true });
+              const lines = chunk.split("\n");
+              lines.forEach(line => {
+                if (line.startsWith("data: ")) {
+                  accumulatedResponse += line.slice(6);
+                }
+              });
+              return readStream();
+            });
+          };
+          return readStream();
         }).catch(err => {
-          resultDiv.innerText = "Error: " + err.message;
+          resultDiv.innerHTML = `<p>Error: ${err.message}</p>`;
         });
       }, "image/jpeg");
     }
@@ -144,23 +194,6 @@
         };
         reader.readAsDataURL(file);
       }
-    });
-
-    // Image mode - form submission
-    document.getElementById("uploadForm").addEventListener("submit", async function (e) {
-      e.preventDefault();
-
-      const formData = new FormData(this);
-
-      const response = await fetch("/analyze", {
-        method: "POST",
-        body: formData
-      });
-
-      const data = await response.json();
-      const resultDiv = document.getElementById("result");
-      resultDiv.innerText = data.analysis || data.error;
-      resultDiv.style.display = "block";
     });
   </script>
 

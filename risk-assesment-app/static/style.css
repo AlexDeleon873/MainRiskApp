@@ -55,6 +55,20 @@ button:hover {
   background-color: #666;
 }
 
+.analysis-btn {
+  display: block;
+  width: 250px;
+  margin: 10px auto;
+  padding: 12px 20px;
+  background-color: #0066cc;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.analysis-btn:hover {
+  background-color: #0052a3;
+}
+
 #result {
   margin-top: 30px;
   padding: 20px;
@@ -69,5 +83,33 @@ button:hover {
   min-height: 100px;
   line-height: 1.6;
   word-wrap: break-word;
-  white-space: pre-wrap;
+  white-space: normal;
+}
+
+#result h1, #result h2, #result h3, #result h4, #result h5, #result h6 {
+  color: #ff6600;
+  margin-top: 15px;
+  margin-bottom: 10px;
+}
+
+#result p {
+  margin: 10px 0;
+}
+
+#result ul, #result ol {
+  margin: 10px 0 10px 20px;
+}
+
+#result li {
+  margin: 5px 0;
+}
+
+#result strong {
+  color: #fff;
+  font-weight: bold;
+}
+
+#result em {
+  color: #ccc;
+  font-style: italic;
 }
