@@ -10,9 +10,12 @@ import io
 
 load_dotenv()
 
+# Read OpenAI API key from key.txt
+with open(os.path.join(os.path.dirname(__file__), 'key.txt'), 'r') as f:
+    OPENAI_API_KEY = f.read().strip()
+
 app = Flask(__name__)
-client = OpenAI(api_key=
-                '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')
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
 
